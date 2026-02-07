@@ -27,7 +27,7 @@ Simplified quantization sweep logic:
         qat_acc[W] = trainer.evaluate()["eval_accuracy"]
 
 ### Plot
-![PTQ vs QAT Accuracy across Fixed-Point Widths](imgs/ptq_vs_qat_accuracy.png)
+![PTQ vs QAT Accuracy across Fixed-Point Widths](../imgs/ptq_vs_qat_accuracy.png)
 
 ### Analysis
 At very low fixed-point widths (4–6 bits), PTQ accuracy collapses toward random-guessing performance, indicating severe quantization noise. In contrast, QAT maintains high accuracy by adapting the model parameters to quantized arithmetic during training.
@@ -59,7 +59,7 @@ For each sparsity level, pruning is followed by finetuning and evaluation.
         acc[s] = trainer.evaluate()["eval_accuracy"]
 
 ### Plot
-![Pruning Performance : L1 Norm vs Random](imgs/pruning_accuracy_vs_sparsity.png)
+![Pruning Performance : L1 Norm vs Random](../imgs/pruning_accuracy_vs_sparsity.png)
 
 ### Analysis
 At low sparsity levels (0.1–0.3), both pruning strategies retain high accuracy, indicating substantial redundancy in the model. L1-Norm pruning slightly outperforms random pruning by removing low-magnitude parameters first.

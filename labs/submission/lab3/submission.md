@@ -21,7 +21,7 @@ study_1 = run_search(obj_1, name="task1_integer", n_trials=20)
 
 ### Plot
 
-![Quantization Effects](imgs/lab3/quantization%20effects%20-%20mixed%20precision%20search.png)
+![Quantization Effects](../imgs/lab3/quantization%20effects%20-%20mixed%20precision%20search.png)
 
 This cumulative maximum ("best accuracy so far") plot tracks the highest accuracy achieved across all trials up to each point. The x-axis is the trial number (1-20), and the y-axis is the running maximum accuracy. Note the narrow y-axis range: 0.830-0.860.
 

@@ -249,11 +249,11 @@ This plot tracks the cumulative maximum accuracy as a function of the number of 
 
 This histogram shows the **distribution of final accuracy values** across all completed trials, with vertical markers for the mean and median. It reveals the overall character of the search space - whether most configurations are viable or whether only a narrow slice of the space produces good results. The distribution is clearly bimodal: a large cluster of trials near ~0.50 (chance-level for binary classification) and a second cluster above ~0.83. The mean (0.6559) is notably higher than the median (0.5647), confirming a right-skewed distribution where a minority of high-performing trials pull the mean up. This bimodality is likely driven by binary and log quantisation families dominating the left mode: when any of `LinearBinary`, `LinearBinaryScaling`, or `LinearLog` are the dominant type in a trial, accuracy collapses to near-chance. The right mode corresponds to trials where higher-precision formats (Integer, BlockLog, BlockFP, Minifloat) dominate. The gap between the two modes (~0.55-0.80) contains very few trials, meaning the search space has an almost binary outcome - a configuration either preserves enough representational capacity to learn, or it doesn't.
 
-### 4. Accuracy by Precision Type (Box Plot)
+### 4. Accuracy by Precision Type 
 
 ![Accuracy by Precision](../imgs/lab3/acc%20by%20precision.png)
 
-This box plot groups trials by their **dominant precision type** - defined as the most frequently occurring layer type among the trial's 9 searched functional groups (each group may contain multiple actual Linear layers, e.g. Q/K/V share one group). Note: this is an approximation; a trial labelled "LinearBlockLog-dominant" may still use Integer or Minifloat in other groups. The plot shows the accuracy distribution within each dominant-type group, sorted by median accuracy.
+This box plot groups trials by their dominant precision type - defined as the most frequently occurring layer type among the trial's 9 searched functional groups (each group may contain multiple actual Linear layers, e.g. Q/K/V share one group). Note: this is an approximation; a trial labelled "LinearBlockLog-dominant" may still use Integer or Minifloat in other groups. The plot shows the accuracy distribution within each dominant-type group, sorted by median accuracy.
 
 The plot, together with the per-precision breakdown table, reveals a clear precision hierarchy:
 

@@ -2,13 +2,20 @@
 
 ## Task 1
 
-> Tutorial 5 shows how to use random search to find the optimal configuration of hyperparameters and layer choices for the BERT model. Now, explore using the `GridSampler` and `TPESampler` in Optuna.
->
+> Explore using the `GridSampler` and `TPESampler` in Optuna.
+
+`GridSampler` is the simplest sampler available. It searches the space exhaustively by evaluating the objective function for all configurations. The evaluation order is random and decided when `GridSampler` is called. It does not leverage any information obtained during trials. This method is infeasible for a large number of dimensions because of the combinatorial explosion of the search space.
+
+`TPESampler` is another sampler which uses information from past trials. First, `n_startup_trials` are random and used for initial exploration. After that, `TPESampler` models the search space by fitting two probability distributions over the parameters: one “good” (low objective values) and one “bad” (high objective values). The parameter γ, defined as
+`γ(n) = min(ceil(0.1 × n), 25)`,
+decides how many trials are considered good. By default, the best 10% of trials are treated as good up to the 250th trial, after which this is fixed to the best 25 trials. New configurations are then sampled by maximising the ratio ( l(x) / g(x) ), which favours regions of the search space that are more likely to yield improved objective values. Unlike `GridSampler`, this approach adapts the search based on observed results, making it significantly more sample-efficient and better suited to high-dimensional or continuous search spaces.
+
+
 > Plot a figure that has the number of trials on the x-axis, and the maximum achieved accuracy up to that point on the y-axis. Plot one curve for each sampler to compare their performance.
 
 ### Plot
 
-![TPE vs Grid Sampler Performance](imgs/sampler_comparison.png)
+![TPE vs Grid Sampler Performance](labs/submission/imgs/sampler_comparison.png)
 
 ### Analysis
 

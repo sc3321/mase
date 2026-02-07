@@ -448,7 +448,7 @@ The ploy above shows the distribution of final accuracy values across all comple
 
 This box plot groups trials by their dominant precision type - defined as the most frequently occurring layer type among the trial's 9 searched functional groups (each group may contain multiple actual Linear layers, e.g. Q/K/V share one group). Note: this is an approximation; a trial labelled "LinearBlockLog-dominant" may still use Integer or Minifloat in other groups. The plot shows the accuracy distribution within each dominant-type group, sorted by median accuracy.
 
-The plot, together with the per-precision breakdown table, reveals a clear precision hierarchy:
+The plot, together with the per-precision breakdown table, illustrates a precision hierarchy:
 
 - **Top tier** (highest mean accuracy): `Linear` (full precision baseline, mean 0.7550), `LinearBlockLog` (mean 0.7483), and `LinearInteger` (mean 0.6795). `Linear` and `LinearBlockLog` also achieve best accuracies above 0.85, indicating they reliably preserve BERT's pretrained knowledge through quantisation. `LinearInteger` shows wider variance (worst 0.4949, best 0.8570) - it can match the best when well-configured but is more sensitive to its hyperparameters.
 - **Mid tier** (wide spread): `LinearMinifloatIEEE` (mean 0.6588), `LinearBinaryResidualSign` (mean 0.6430), `LinearBlockFP` (mean 0.6305), and `LinearMinifloatDenorm` (mean 0.5862). These can achieve good accuracy (bests of 0.84-0.85) when paired with the right configuration and placed on the right layers, but are less robust - their worst-case accuracies are near chance.
@@ -526,7 +526,7 @@ Bottom trial #78 (accuracy 0.4949) uses 8 different layer types across 9 groups.
 
 **Early-stage layers are more critical than mid-stage layers.** 
 
-Comparing top and bottom trials reveals that the early encoder stage quantisation choices drive accuracy more than mid-stage choices. With only 2 encoder layers in BERT-tiny (layer 0 = early, layer 1 = mid), the error-compounding depth difference is modest. However, the early encoder layer receives the normalised token embeddings (after LayerNorm), whose statistical properties differ from the residual-stream representations at layer 1 (which have already been refined by attention and FFN). Quantising the first encoder's layers aggressively seems to disrupt the pretrained representations at a point where all subsequent computation depends on them, and the residual connections propagate these errors through the rest of the network. The top-trial convergence table shows all 5 best trials agree exactly on early-stage attention choices (LinearInteger for Q/K/V, LinearBlockLog for output), while mid-stage choices show more variation  mid.attn_out uses 3 different types across the top 5, and mid.ffn layers vary across BlockFP, BlockLog, BlockMinifloat, and MinifloatDenorm. (Mid.attn_qkv does partially converge on LinearBlockLog in 4 of 5 trials, suggesting this group has moderate sensitivity.)
+Comparing top and bottom trials leads to the conclusion that the early encoder stage quantisation choices drive accuracy more than mid-stage choices. With only 2 encoder layers in BERT-tiny (layer 0 = early, layer 1 = mid), the error-compounding depth difference is modest. However, the early encoder layer receives the normalised token embeddings (after LayerNorm), whose statistical properties differ from the residual-stream representations at layer 1 (which have already been refined by attention and FFN). Quantising the first encoder's layers aggressively seems to disrupt the pretrained representations at a point where all subsequent computation depends on them, and the residual connections propagate these errors through the rest of the network. The top-trial convergence table shows all 5 best trials agree exactly on early-stage attention choices (LinearInteger for Q/K/V, LinearBlockLog for output), while mid-stage choices show more variation  mid.attn_out uses 3 different types across the top 5, and mid.ffn layers vary across BlockFP, BlockLog, BlockMinifloat, and MinifloatDenorm. (Mid.attn_qkv does partially converge on LinearBlockLog in 4 of 5 trials, suggesting this group has moderate sensitivity.)
 
 ---
 ---
@@ -966,4 +966,5 @@ class QuantLinearAdapter(nn.Module):
 
         return y
 ```
+
 

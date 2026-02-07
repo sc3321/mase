@@ -96,7 +96,7 @@ def make_objective(
 
 ### Plot
 
-![Compression-Aware Training](../imgs/sampler_comparison.png)
+![Compression-Aware Training](../imgs/compression%20aware%20training.png)
 
 ### Analysis
 

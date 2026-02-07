@@ -1,7 +1,5 @@
 # Lab 1: Quantization Aware Training and Pruning
 
-This lab investigates the effects of **quantization precision** and **model pruning** on the performance of a BERT-based sentiment classifier on the IMDb dataset. Following **Tutorial 3 (Quantization)** and **Tutorial 4 (Pruning)**, we first compare Post-Training Quantization (PTQ) and Quantization Aware Training (QAT) across a range of fixed-point widths, and then evaluate different pruning strategies at increasing sparsity levels.
-
 ---
 
 ## Task 1: Quantization Precision Sweep (PTQ vs QAT)
@@ -70,3 +68,4 @@ At moderate sparsity levels (0.4–0.6), random pruning degrades sharply as impo
 
 ## Summary
 This lab shows that **QAT combined with magnitude-based pruning** provides an effective strategy for compressing transformer models while maintaining strong predictive performance.
+

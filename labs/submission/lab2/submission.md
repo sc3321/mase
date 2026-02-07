@@ -1,4 +1,4 @@
-# Lab 3: Neural Architecture Search
+# Lab 2: Neural Architecture Search
 
 ## Task 1
 
@@ -8,7 +8,7 @@
 
 ### Plot
 
-![TPE vs Grid Sampler Performance](imgs/TPE%20vs%20grid%20perf.png)
+![TPE vs Grid Sampler Performance](imgs/sampler_comparison.png)
 
 ### Analysis
 

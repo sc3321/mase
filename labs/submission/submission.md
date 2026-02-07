@@ -968,5 +968,260 @@ class QuantLinearAdapter(nn.Module):
         return y
 ```
 
+# Lab 4 – Software Stream
+
+## 1. torch.compile: Why Do We Not Immediately Observe Speedups?
+
+### Observation
+
+In the first part of Lab 4, using `torch.compile` did not lead to obvious runtime speedups compared to eager execution. In some cases, the compiled model appeared significantly slower.
+
+### Why This Happens
+
+The lack of immediate speedup is primarily explained by **compilation overhead**, **graph guards**, and **benchmarking methodology issues**, rather than a failure of `torch.compile` itself.
+
+#### Compilation Overhead
+
+The first invocation of a `torch.compile` model triggers:
+
+- FX graph capture via TorchDynamo  
+- Kernel lowering and code generation via TorchInductor  
+- Kernel compilation (Triton / CUDA)  
+- Optional autotuning  
+
+If timing includes this first execution or uses only a small number of iterations, this one-time cost dominates the measured runtime.
+
+#### Graph Guards and Recompilation
+
+TorchDynamo inserts runtime guards that check assumptions about:
+
+- Tensor shapes  
+- Strides  
+- Dtypes  
+
+If any assumption is violated (for example, due to a stride change caused by `view` or `transpose`), Dynamo may recompile the graph or fall back to eager execution. Guard checks and recompilations introduce overhead that can outweigh optimisation gains.
+
+#### Graph Breaks
+
+When TorchDynamo encounters unsupported Python constructs or data-dependent control flow, it introduces graph breaks. Execution then alternates between compiled and eager segments, preventing cross-operation fusion and adding tensor materialisation overhead.
+
+#### Vendor Kernel Competition
+
+On CPU, eager execution already dispatches to highly tuned vendor libraries such as MKL and oneDNN. For large GEMMs and convolutions, TorchInductor-generated kernels may not outperform these hand-optimised implementations. Inductor is most effective when fusing many small elementwise operations.
+
+### Results
+
+| Device | Timed Iterations | Baseline Time (s) | Compiled Time (s) |
+|------|-----------------|------------------|------------------|
+| CUDA | 1  | 10.2194 | 35.4226 |
+| CUDA | 10 | 0.01142 | 0.01029 |
+| CUDA | 25 | 0.01146 | 0.01028 |
+| CPU  | 1  | 3.00199 | 27.32062 |
+| CPU  | 10 | 0.76906 | 0.61558 |
+| CPU  | 25 | 0.78284 | 0.63501 |
+
+### Interpretation
+
+When only a single iteration is timed, the compiled model appears slower due to compilation overhead. Once amortised over multiple iterations, `torch.compile` provides modest but consistent speedups on both CPU and GPU.
+
+---
+
+## 2. Kernel Fusion: Naive vs Fused SDPA
+
+### Task
+
+Profile a fused Scaled Dot Product Attention (SDPA) kernel and compare its runtime behaviour against a naive implementation. Repeat on CUDA.
+
+### Results
+
+#### CPU
+
+| Seq Length | Naive Time (s) | Fused Time (s) | Max Abs Error |
+|-----------|---------------|---------------|---------------|
+| 64  | 0.00261 | 0.00101 | 8.34e-07 |
+| 128 | 0.01160 | 0.00349 | 8.34e-07 |
+| 256 | 0.04429 | 0.01297 | 7.15e-07 |
+| 512 | 0.16359 | 0.04561 | 7.15e-07 |
+
+#### CUDA
+
+| Seq Length | Naive Time (s) | Fused Time (s) | Max Abs Error |
+|-----------|---------------|---------------|---------------|
+| 64  | 0.000126 | 0.000035 | 1.95e-03 |
+| 128 | 0.000162 | 0.000036 | 1.95e-03 |
+| 256 | 0.000245 | 0.000091 | 1.46e-03 |
+| 512 | 0.001509 | 0.000199 | 1.46e-03 |
+
+### Interpretation
+
+Across all sequence lengths, the fused implementation outperforms the naive version on both CPU and GPU. The performance gap grows with sequence length.
+
+- On CPU, fusion reduces intermediate memory traffic and improves cache locality.  
+- On GPU, fusion reduces kernel launch overhead and global memory accesses.  
+
+The maximum absolute error remains small, confirming numerical correctness.
+
+---
+
+## 3. MXINT8: Benefits for Custom Hardware
+
+### Question
+
+How does MXINT8 benefit custom hardware if both activations and weights are quantised to MXINT8?
+
+### Explanation
+
+MXINT8 represents values as a signed fixed-point mantissa with a shared exponent per group:
+
+```
+value = 2^(exponent − 127) × mantissa
+```
+
+When both activations and weights are MXINT8, a dot product between groups becomes:
+
+```
+x_i · w_i = 2^(e_x + e_w) × (m_x(i) × m_w(i))
+```
+
+The mantissa multiplication is `int8 × int8 → int16`, accumulated into `int32`. The exponent addition happens once per group and is applied as a bit shift.
+
+### Hardware Implications
+
+- Integer MAC units are smaller and lower power than FP16/FP32 units  
+- Exponent handling is amortised across groups  
+- MXINT8 provides better dynamic range than plain INT8  
+- Custom hardware can achieve higher throughput per watt  
+
+Current GPUs lack native MXINT support and must dequantise to floating point. Custom ASICs, NPUs, or FPGAs can implement MXINT directly.
+
+---
+
+## 4. MXINT Dequantisation: `dont_need_abs` and `bias`
+
+### Problem
+
+Unlike IEEE floating-point formats, MXINT mantissas do not have an implicit leading one.
+
+### `dont_need_abs`
+
+The check:
+
+```
+mantissa_abs & 0x40
+```
+
+tests whether the mantissa magnitude lies in `[1.0, 2.0)`.
+
+- If set, the mantissa already matches BF16’s implicit leading-one assumption.  
+- If unset, the mantissa lies in `[0.0, 1.0)` and requires correction.  
+
+This flag effectively indicates whether a leading one is present.
+
+### `bias`
+
+The bias is constructed as a BF16 number with the same sign and exponent but zero fraction:
+
+```
+(−1)^s × 2^(E−127) × 1.0
+```
+
+Subtracting this bias removes BF16’s implicit leading-one contribution when the MXINT mantissa does not contain it. This also correctly handles the zero-mantissa case.
+
+---
+
+## 5. CUTE: How `cta_tiler` Partitions Data
+
+### Question
+
+How does `cta_tiler` partition data for copying to shared memory?
+
+### Explanation
+
+The MXINT8 tensor is reshaped into a logical 2D tensor:
+
+```
+[num_groups, group_size]
+```
+
+`cta_tiler` defines a tile `(CTA_G, CTA_S)` handled by a single CTA. Using `local_tile`, each CTA:
+
+- Selects a rectangular tile of groups and elements  
+- Cooperatively copies it from global memory to shared memory  
+- Aligns the contiguous dimension for coalesced accesses  
+- Uses predication to handle boundary tiles  
+
+This partitions the tensor into a grid of CTA-owned tiles.
+
+---
+
+## 6. CUTE: How `layout_sX` Partitions Threads
+
+### Question
+
+How does `layout_sX` partition work across threads in a CTA?
+
+### Explanation
+
+`layout_sX` maps `threadIdx.x` to elements of the shared-memory tile. Calling:
+
+```
+local_partition(sX, layout_sX, thread_id)
+```
+
+returns a per-thread fragment such that:
+
+- Each element is owned by exactly one thread  
+- No overlaps or gaps occur  
+- Access patterns are regular and strided  
+
+This enables balanced work distribution, avoids shared-memory bank conflicts, and exposes instruction-level parallelism.
+
+---
+
+## 7. GPU Memory Savings: Why They Are Lower Than Theoretical
+
+### Question
+
+Why is the saved GPU memory not exactly:
+
+```
+(32 − (8 + 8/32)) / 32 ≈ 74.2%
+```
+
+### Explanation
+
+The theoretical saving assumes only weight storage is affected. In practice:
+
+- Only `nn.Linear` layers are quantised  
+- Embeddings, LayerNorms, biases remain FP32  
+- Activations and temporary buffers dominate peak memory  
+- `torch.cuda.max_memory_allocated()` reports peak allocator usage  
+- Padding, alignment, and fragmentation inflate memory usage  
+
+If baseline memory is:
+
+```
+W_fp32 + A
+```
+
+and quantised memory is:
+
+```
+W_mxint8 + A
+```
+
+then:
+
+```
+1 − (W_mxint8 + A) / (W_fp32 + A) < 74.2%
+```
+
+This explains the observed discrepancy.
+
+---
+
+## Summary
+
+The lack of immediate speedups from `torch.compile` is due to compilation overhead and benchmarking errors. Kernel fusion provides clear performance gains on both CPU and GPU. MXINT8 enables efficient integer-only computation on custom hardware, while the dequantisation kernel carefully bridges MXINT semantics to BF16. Observed memory savings fall short of theory due to unquantised components and allocator behaviour.
 
 

@@ -105,7 +105,7 @@ decides how many trials are considered good. By default, the best 10% of trials 
 
 ### Analysis
 
-The results show that TPE outperforms grid search. This is expected because the search space is large(grid didn't get good configurations in the first 50 trials). Also, TPE curve shows a significant jump right after the 10th iteration when TPE starts actual optimisation.
+The results show that TPE outperforms grid search. This is expected because the search space is large(grid didn't get good configurations in the first 50 trials). Also, TPE curve shows a significant jump right after the 10th iteration when TPE starts optimisation.
 
 ---
 
@@ -176,6 +176,7 @@ def make_objective(
 ```
 
 `TPESampler` was chosen for this task because performed significantly better than GridSampler(over reasonable number of trials) in the Task 1. The following plot has the number of trials on the x-axis, and the maximum achieved accuracy up to that point on the y-axis. 
+
 > 1. The best performance from Task 1 (without compression)
 > 2. Compression-aware search without post-compression training
 > 3. Compression-aware search with post-compression training
@@ -186,7 +187,7 @@ def make_objective(
 
 ### Analysis
 
-The results show that ...
+Compression-aware methods with post-compression training outperform compression-aware search without post-compression training. This is because post-compression training fine-tunes the model to the applied quantisation and compensates for quantisation error. However, this takes longer, and therefore increases the overall optimisation time and computational cost. The accuracy of the optimised compressed model is similar to the best found in Task 1.
 
 
 
@@ -966,5 +967,6 @@ class QuantLinearAdapter(nn.Module):
 
         return y
 ```
+
 
 

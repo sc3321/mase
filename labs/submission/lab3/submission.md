@@ -94,8 +94,6 @@ from chop.nn.quantized.modules.linear import (
   "frac_widths": [2, 4, 8],
 
   # exponent-based
-  # Minifloat and Log layers both register <prefix>__exp_bias,
-  # so their choice sets must be identical.
   "exponent_widths": [3, 4, 5],
   "exponent_biases": [3, 7, 15],
   "log_exponent_biases": [7, 15, 31],
@@ -247,7 +245,7 @@ This plot tracks the cumulative maximum accuracy as a function of the number of 
 
 ![Accuracy Distribution](../imgs/lab3/acc%20dist.png)
 
-This histogram shows the **distribution of final accuracy values** across all completed trials, with vertical markers for the mean and median. It reveals the overall character of the search space - whether most configurations are viable or whether only a narrow slice of the space produces good results. The distribution is clearly bimodal: a large cluster of trials near ~0.50 (chance-level for binary classification) and a second cluster above ~0.83. The mean (0.6559) is notably higher than the median (0.5647), confirming a right-skewed distribution where a minority of high-performing trials pull the mean up. This bimodality is likely driven by binary and log quantisation families dominating the left mode: when any of `LinearBinary`, `LinearBinaryScaling`, or `LinearLog` are the dominant type in a trial, accuracy collapses to near-chance. The right mode corresponds to trials where higher-precision formats (Integer, BlockLog, BlockFP, Minifloat) dominate. The gap between the two modes (~0.55-0.80) contains very few trials, meaning the search space has an almost binary outcome - a configuration either preserves enough representational capacity to learn, or it doesn't.
+The ploy above shows the distribution of final accuracy values across all completed trials. It reveals the overall character of the search space - whether most configurations are viable or whether only a narrow slice of the space produces good results. The distribution is clearly bimodal: a large cluster of trials near ~0.50 (chance-level for binary classification) and a second cluster above ~0.83. The mean (0.6559) is notably higher than the median (0.5647), confirming a right-skewed distribution where a minority of high-performing trials pull the mean up. This bimodality is likely driven by binary and log quantisation families dominating the left mode: when any of `LinearBinary`, `LinearBinaryScaling`, or `LinearLog` are the dominant type in a trial, accuracy collapses to near-chance. The right mode corresponds to trials where higher-precision formats (Integer, BlockLog, BlockFP, Minifloat) dominate. The gap between the two modes (~0.55-0.80) contains very few trials, meaning the search space has an almost binary outcome - a configuration either preserves enough representational capacity to learn, or it doesn't.
 
 ### 4. Accuracy by Precision Type 
 

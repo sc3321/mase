@@ -13,6 +13,28 @@ The lab observes that `torch.compile` can produce a model that runs *slower* tha
 - Leaving gradient computation enabled
 - Measuring only the first run.
 
+### Results
+
+The table below reports the measured execution time of the baseline eager model and the `torch.compile` optimised model on both CPU and GPU, using different numbers of timed iterations.
+
+| Device | Timed Iterations | Baseline Time (s) | Compiled Time (s) |
+| ------ | ---------------- | ----------------- | ----------------- |
+| CUDA   | 1                | 10.2194           | 35.4226           |
+| CUDA   | 10               | 0.01142           | 0.01029           |
+| CUDA   | 25               | 0.01146           | 0.01028           |
+| CPU    | 1                | 3.00199           | 27.32062          |
+| CPU    | 10               | 0.76906           | 0.61558           |
+| CPU    | 25               | 0.78284           | 0.63501           |
+
+### Interpretation
+
+When only a single iteration is measured, the compiled model appears significantly slower on both CPU and GPU. This is because the first invocation includes graph capture, code generation, kernel compilation, and runtime setup overhead, which dominate the measured runtime.
+
+As the number of timed iterations increases, this one-time compilation cost is amortised. For both CPU and GPU, the compiled model becomes faster than the baseline at 10 and 25 iterations, demonstrating that `torch.compile` can provide performance improvements when steady-state execution is measured.
+
+These results confirm that incorrect benchmarking methodology—particularly failing to include warm-up iterations—can lead to misleading conclusions about the effectiveness of `torch.compile`.
+
+
 ---
 
 ## 2. MXINT8: Benefits for Custom Hardware
@@ -36,6 +58,39 @@ The mantissa products `m_x(i) x m_w(i)` are int8 x int8 -> int16 multiplications
 
 
 Current GPUs are architected around FP16/BF16/TF32 datapaths and vendor GEMM libraries. They lack native MXINT compute units, so they must dequantise MXINT values back to a floating-point format before computation. Custom ASICs, FPGAs, or NPUs can be designed with native MXINT datapaths, avoiding this dequantisation step
+
+
+### Results
+
+The following tables compare the execution time of a naive implementation and a fused implementation for different sequence lengths on CPU and GPU. The maximum absolute error is reported to verify numerical correctness.
+
+#### CPU Results
+
+| Device | Seq Length | Naive Time (s) | Fused Time (s) | Max Abs Error |
+| ------ | ---------- | -------------- | -------------- | ------------- |
+| CPU    | 64         | 0.00261        | 0.00101        | 8.34e-07     |
+| CPU    | 128        | 0.01160        | 0.00349        | 8.34e-07     |
+| CPU    | 256        | 0.04429        | 0.01297        | 7.15e-07     |
+| CPU    | 512        | 0.16359        | 0.04561        | 7.15e-07     |
+
+#### CUDA Results
+
+| Device | Seq Length | Naive Time (s) | Fused Time (s) | Max Abs Error |
+| ------ | ---------- | -------------- | -------------- | ------------- |
+| CUDA   | 64         | 0.000126       | 0.000035       | 1.95e-03     |
+| CUDA   | 128        | 0.000162       | 0.000036       | 1.95e-03     |
+| CUDA   | 256        | 0.000245       | 0.000091       | 1.46e-03     |
+| CUDA   | 512        | 0.001509       | 0.000199       | 1.46e-03     |
+
+### Interpretation
+
+Across all sequence lengths, the fused implementation consistently outperforms the naive implementation on both CPU and GPU. The performance gap increases as the sequence length grows, indicating that kernel fusion becomes more beneficial as the workload size increases.
+
+On CPU, fusion greatly reduces execution time by eliminating intermediate memory writes and improving cache locality. On GPU, fusion reduces kernel launch overhead and global memory traffic, leading to a big amount if speedups even for relatively small sequence lengths.
+
+The maximum absolute error remains small across all experiments, demonstrating that the fused implementation preserves numerical correctness while achieving higher performance.
+
+These results illustrate how operator fusion can significantly improve efficiency by reducing memory movement and execution overhead, particularly for workloads involving repeated elementwise or reduction operations.
 
 ---
 

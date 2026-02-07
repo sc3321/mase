@@ -29,10 +29,67 @@ The results show that TPE outperforms grid search. This is expected because the 
 
 > In the objective function, after the model is constructed and trained for some iterations, call the `CompressionPipeline` to quantize and prune the model, then continue training for a few more epochs. Use the sampler that yielded the best results in Task 1 to run the compression-aware search. The objective function should return the final accuracy of the model after compression. Consider also the case where final training is performed after quantization/pruning.
 
+The objective was modified in the following way to run the compression-aware search. 
+```python
+EPOCHS_PRE_COMPRESSION = 1
+EPOCHS_POST_COMPRESSION = 1
+def make_objective(
+    *,
+    do_compress: bool,
+    do_post_compress_train: bool,
+    epochs_pre: int = EPOCHS_PRE_COMPRESSION,
+    epochs_post: int = EPOCHS_POST_COMPRESSION,
+):
+    def objective(trial: optuna.Trial) -> float:
+        model = construct_model(trial)
 
-TODO: INSERT CODE SNIPPET of objective function with pruning
+        trainer_pre = get_trainer(
+            model=model,
+            tokenized_dataset=dataset,
+            tokenizer=tokenizer,
+            evaluate_metric="accuracy",
+            num_train_epochs=epochs_pre,
+        )
+        trainer_pre.train()
+        
+        if not do_compress:
+            eval_results = trainer_pre.evaluate()
+            trial.set_user_attr("model", model)
+            return float(eval_results["eval_accuracy"])
+        
+        model = model.to("cpu")
+        mg = MaseGraph(model)
+        pipe = CompressionPipeline()
+        mg, _ = pipe(
+            mg,
+            pass_args={
+                "quantize_transform_pass": quantization_config,
+                "prune_transform_pass": pruning_config,
+            },
+        )
 
-> Plot a new figure that has the number of trials on the x-axis, and the maximum achieved accuracy up to that point on the y-axis. There should be three curves:
+        compressed_model = mg.model
+
+        trainer_post = get_trainer(
+            model=compressed_model,
+            tokenized_dataset=dataset,
+            tokenizer=tokenizer,
+            evaluate_metric="accuracy",
+            num_train_epochs=(epochs_post if do_post_compress_train else 0),
+        )
+
+        if do_post_compress_train and epochs_post > 0:
+            trainer_post.train()
+
+        eval_results = trainer_post.evaluate()
+        trial.set_user_attr("model", compressed_model)
+        return float(eval_results["eval_accuracy"])
+
+    return objective
+
+```
+
+`TPESampler` was chosen for this task because performed significantly better than GridSampler(over reasonable number of trials) in the Task 1. The following plot has the number of trials on the x-axis, and the maximum achieved accuracy up to that point on the y-axis. 
 > 1. The best performance from Task 1 (without compression)
 > 2. Compression-aware search without post-compression training
 > 3. Compression-aware search with post-compression training
@@ -42,3 +99,5 @@ TODO: INSERT CODE SNIPPET of objective function with pruning
 ![Compression-Aware Training](../imgs/sampler_comparison.png)
 
 ### Analysis
+
+The results show that ...
